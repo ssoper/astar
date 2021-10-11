@@ -1,0 +1,63 @@
+<% content_for :head do -%>
+<%= javascript_include_tag 'raphael-1.3.1', 'jquery-center' %>
+<script type="text/javascript">
+function getCoords(start, evt, offset) {
+  return 'M' + start[0] + ' ' + start[1] + ' L' + (evt.pageX - offset[0]) + ' ' + (evt.pageY - offset[1])
+}
+
+function animateClick(canvas, coords) {
+  var circle = canvas.circle(coords[0], coords[1], 5);
+  circle.animate({ r: 20, opacity: 0 }, 250)
+}
+
+$(document).ready(function() {
+  var start = false;
+  var line = false;
+
+  $('#view-port').center({ vertical: false });
+  var canvas = Raphael($('#view-port')[0], $('#view-port').width(), $('#view-port').height());
+  var offset = [$('#view-port').offset().left, $('#view-port').offset().top];
+
+  $(window).resize(function() {
+    offset = [$('#view-port').offset().left, $('#view-port').offset().top];
+  })
+
+  $('#view-port').mousedown(function(evt) {
+    start = [evt.pageX - offset[0], evt.pageY - offset[1]];
+    animateClick(canvas, start);
+  })
+
+  $('#view-port').mousemove(function(evt) {
+    if (start) {
+      if (line) {
+        line.attr({ path: getCoords(start, evt, offset)});
+      } else {
+        line = canvas.path(getCoords(start, evt, offset));
+      }
+    }
+  })
+
+  $('#view-port').mouseup(function(evt) {
+    if (start)
+      start = false;
+    if (line) {
+      line.hide();
+      line = false;
+    }
+  })
+})
+</script>
+<style>
+div#view-port {
+  position: absolute;
+  top: 50px;
+  width: 800px;
+  height: 1400px;
+  border: thin solid black;
+}
+</style>
+<% end -%>
+
+<div id="view-port">
+  
+</div>

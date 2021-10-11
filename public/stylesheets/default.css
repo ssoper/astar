@@ -1,0 +1,24 @@
+.cell {
+  float: left;
+  border: solid thin black;
+  border-left: none;
+  border-top: none;
+  width: 100px;
+  height: 100px;
+  text-align: center;
+  line-height: 100px;
+}
+
+.first-column {
+/*  margin-left: 20px;*/
+  border-left: solid thin black;
+}
+
+.first-row {
+/*  margin-top: 20px;*/
+  border-top: solid thin black;
+}
+
+.break {
+  clear: left;
+}

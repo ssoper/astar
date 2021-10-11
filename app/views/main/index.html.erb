@@ -1,0 +1,274 @@
+<% content_for :head do -%>
+<%= javascript_include_tag 'raphael-1.3.1', 'jquery-center' %>
+<script type="text/javascript">
+function lowest(open, costs) {
+  var node_id = open.reduce(function(prev, curr) {
+    if (costs[curr] < costs[prev])
+      return curr;
+    return prev;
+  })
+
+  return node_id;
+};
+
+function buildPath(final, parents) {
+  var path = ['#' + final];
+  var current = parents[final];
+
+  while (!!current) {
+    path.unshift('#' + current);
+    current = parents[current];
+  }
+
+  return path;
+};
+
+(function($) {
+  $.fn.toggleHighlight = function(color, per_row) {
+    var per_row = per_row || 5;
+
+    this.each(function() {
+      var index = $('div.cell').index(this);
+
+      $(this).css('border-color', color);
+    
+      var search = index - 1;
+      if (search >= 0 && (index % per_row != 0))
+        $('div.cell:eq(' + search + ')').css('border-right-color', color);
+
+      search = index - per_row;
+      if (search >= 0)
+        $('div.cell:eq(' + search + ')').css('border-bottom-color', color);
+    });
+  };
+
+  $.fn.neighbors = function(per_row) {
+    var per_row = per_row || 5;
+    var result = [];
+    var index = $('div.cell').index(this);
+    var last = $('div.cell').index($('div.cell:last'));
+    var search = 0;
+
+    // Left
+    search = index - 1;
+    if (search >= 0 && (index % per_row != 0))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Right
+    search = index + 1;
+    if (search >= 0 && ((index % per_row) != (per_row - 1)))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Top
+    search = index - per_row;
+    if (search >= 0)
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Bottom
+    search = index + per_row;
+    if (search <= last)
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Upper left
+    search = index - (per_row + 1);
+    if (search >= 0 && (index % per_row != 0))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Upper right
+    search = index - (per_row - 1);
+    if (search >= 0 && ((index % per_row) != (per_row - 1)))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Bottom right
+    search = index + (per_row + 1);
+    if (search <= last && ((index % per_row) != (per_row - 1)))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    // Bottom left
+    search = index + (per_row - 1);
+    if (search <= last && (index % per_row != 0))
+      result.push($('div.cell:eq(' + search + ')')[0]);
+
+    return $(result);
+  };
+
+  $.fn.findBorder = function(orientation) {
+    var coords = [];
+    var result = 0;
+
+    switch (orientation) {
+      case 'top':
+        $(this).filter(function() {
+          coords.push($(this).offset().top);
+        });
+        result = coords.min();
+        break;
+      case 'bottom':
+        $(this).filter(function() {
+          coords.push($(this).offset().top + $(this).height());
+        });
+        result = coords.max();
+        break;
+      case 'left':
+        $(this).filter(function() {
+          coords.push($(this).offset().left);
+        });
+        result = coords.min();
+        break;
+      case 'right':
+        $(this).filter(function() {
+          coords.push($(this).offset().left + $(this).width());
+        });
+        result = coords.max();
+        break;
+    };
+
+    return result;
+  };
+
+  $.fn.findPath = function(start) {
+    var goal = $(this).attr('id');
+    var openList = [$(start).attr('id')];
+    var openCostList = [];
+    openCostList[$(start).attr('id')] = 0;
+
+    var closed = [];
+    var parents = [];
+
+    while (openList.length > 0) {
+      var currentNode = lowest(openList, openCostList);
+      var currentCost = openCostList[currentNode];
+
+      if (goal == currentNode) {
+        var finalPath = buildPath(currentNode, parents);
+        return $(finalPath.join(', '))
+      } else {
+        closed[currentNode] = true;
+        var nodeIndex = $.inArray(currentNode, openList);
+        openList.remove(nodeIndex);
+
+        var neighbors = [];
+        $('#' + currentNode).neighbors(<%= @columns %>).filter(function() {
+          neighbors.push($(this).attr('id'));
+        });
+
+        $.each(neighbors, function(i, v) {
+          if (!(openCostList[v] || closed[v])) {
+            openList.push(v);
+            openCostList[v] = currentCost + 1;
+            parents[v] = currentNode;
+          }
+        });
+      }
+    }
+  }
+  
+  $.fn.findPathBinaryHeap = function(start) {
+    var goal = $(this).attr('id');
+    var openCostList = [];
+    openCostList[$(start).attr('id')] = 0;
+    var openList = new BinaryHeap(function(val) { return openCostList[val]; });
+    openList.push($(start).attr('id'));
+    var closed = [];
+    var parents = [];
+
+    while (openList.size() > 0) {
+      var currentNode = openList.pop();
+      var currentCost = openCostList[currentNode];
+
+      if (goal == currentNode) {
+        var finalPath = buildPath(currentNode, parents);
+        return $(finalPath.join(', '))
+      } else {
+        closed[currentNode] = true;
+
+        var neighbors = [];
+        $('#' + currentNode).neighbors(<%= @columns %>).filter(function() {
+          neighbors.push($(this).attr('id'));
+        });
+
+        $.each(neighbors, function(i, v) {
+          if (!(openCostList[v] || closed[v])) {
+            openList.push(v);
+            openCostList[v] = currentCost + 1;
+            parents[v] = currentNode;
+          }
+        });
+      }
+    }
+  }
+})(jQuery);
+
+$(document).ready(function() {
+  var mouseBtnDown = false;
+  var borderTop = $('div.cell').findBorder('top');
+  var borderLeft = $('div.cell').findBorder('left');
+  var borderRight = $('div.cell').findBorder('right');
+  var borderBottom = $('div.cell').findBorder('bottom');
+  var currentCell = false;
+  var startCell = false;
+
+  count = 0;
+  $('div.cell').filter(function() {
+    $(this).attr('id', 'count_' + count++);
+  });
+
+  $('div.cell').mousedown(function() {
+    mouseBtnDown = true;    
+    startCell = this;
+    return false;
+  });
+
+  $('body').mouseup(function(e) {
+    mouseBtnDown = false;
+    $('div.cell').toggleHighlight('black', <%= @columns %>);
+    if (e.pageX > borderRight || 
+        e.pageX < borderLeft ||
+        e.pageY < borderTop ||
+        e.pageY > borderBottom) {
+      currentCell = false;
+    } else {
+      $(currentCell).toggleHighlight('red', <%= @columns %>);
+    }
+  });
+
+  $('div.cell').hover(function() {
+    if (mouseBtnDown && startCell && startCell != this) {
+      currentCell = this;
+      $('div.cell').toggleHighlight('black', <%= @columns %>);
+      var start = (new Date).getTime();
+      $(currentCell).findPath(startCell).toggleHighlight('red', <%= @columns %>);
+      // console.log('took ' + ((new Date).getTime() - start));
+    } else {
+      $(this).toggleHighlight('red', <%= @columns %>);
+    }
+  }, function() {
+    if (!mouseBtnDown)
+      $(this).toggleHighlight('black', <%= @columns %>)
+  });
+  
+  $('#view-port').center({ vertical: false });
+});
+</script>
+<style>
+div#view-port {
+  position: absolute;
+  top: 50px;
+  width: <%= (@columns + 1) * 100 %>px;
+  height: <%= (@rows + 1) * 100 %>px;
+  border: none;
+}
+</style>
+<% end -%>
+<% count = 1 -%>
+
+<div id='view-port'>
+<% @rows.times do |row| -%>
+<% @columns.times do |column| -%>
+  <div class='cell<%= " first-row" if row == 0 %><%= " first-column" if column == 0 %>'><%= count %></div>
+  <% count+=1 -%>
+<% end -%>
+
+  <div class='break'></div>
+<% end -%>
+</div>
